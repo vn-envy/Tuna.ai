@@ -75,3 +75,23 @@ npm install
 npm run dev
 ```
 Visit `http://localhost:3000`
+
+For local map and chat integration, create `frontend/.env.local` with:
+```bash
+GOOGLE_MAPS_API_KEY=your-google-maps-browser-key
+BACKEND_URL=http://localhost:8000
+```
+
+### Cloud Run Deployment
+Deploy the backend first, then the frontend so the web service can proxy chat requests to the API and read the Google Maps key at runtime:
+```bash
+export TUNA_PROJECT_ID=your-gcp-project
+export TUNA_REGION=asia-south1
+export GOOGLE_MAPS_API_KEY=your-google-maps-browser-key
+export API_AUTH_TOKEN=mock_jwt_token_12345
+
+bash scripts/deploy_backend.sh
+bash scripts/deploy_web.sh
+```
+
+If the map says configuration is needed after deployment, set `GOOGLE_MAPS_API_KEY` on the `tuna-web` Cloud Run service. If chat cannot reach Tuna, set `BACKEND_URL` on `tuna-web` to the deployed `tuna-api` Cloud Run URL.

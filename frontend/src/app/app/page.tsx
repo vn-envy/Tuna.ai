@@ -6,6 +6,12 @@ import PartnershipDashboard from "@/components/partnerships/PartnershipDashboard
 
 export default function WorkspacePage() {
   const [activeTab, setActiveTab] = useState("map");
+  const navItems = [
+    { id: "map", label: "Map View", icon: "🗺️" },
+    { id: "itinerary", label: "Itinerary", icon: "📋" },
+    { id: "budget", label: "Budget", icon: "💰" },
+    { id: "partnerships", label: "Partnerships", icon: "🤝" },
+  ];
 
   return (
     <div className="flex h-screen bg-[#0a0f1a] text-white overflow-hidden font-sans">
@@ -18,31 +24,18 @@ export default function WorkspacePage() {
           <h1 className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-[#00d4aa] to-[#0ea5e9] mr-8">
             Tuna Workspace
           </h1>
-          <nav className="flex space-x-6">
-            <button 
-              onClick={() => setActiveTab("map")}
-              className={`pb-4 pt-4 border-b-2 font-medium transition-colors ${activeTab === 'map' ? 'border-[#00d4aa] text-[#00d4aa]' : 'border-transparent text-slate-400 hover:text-white'}`}
-            >
-              🗺️ Map View
-            </button>
-            <button 
-              onClick={() => setActiveTab("itinerary")}
-              className={`pb-4 pt-4 border-b-2 font-medium transition-colors ${activeTab === 'itinerary' ? 'border-[#00d4aa] text-[#00d4aa]' : 'border-transparent text-slate-400 hover:text-white'}`}
-            >
-              📋 Itinerary
-            </button>
-            <button 
-              onClick={() => setActiveTab("budget")}
-              className={`pb-4 pt-4 border-b-2 font-medium transition-colors ${activeTab === 'budget' ? 'border-[#00d4aa] text-[#00d4aa]' : 'border-transparent text-slate-400 hover:text-white'}`}
-            >
-              💰 Budget
-            </button>
-            <button 
-              onClick={() => setActiveTab("partnerships")}
-              className={`pb-4 pt-4 border-b-2 font-medium transition-colors ${activeTab === 'partnerships' ? 'border-[#00d4aa] text-[#00d4aa]' : 'border-transparent text-slate-400 hover:text-white'}`}
-            >
-              🤝 Partnerships
-            </button>
+          <nav className="flex space-x-2 md:space-x-6" aria-label="Workspace sections">
+            {navItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                onClick={() => setActiveTab(item.id)}
+                aria-current={activeTab === item.id ? "page" : undefined}
+                className={`pb-4 pt-4 border-b-2 font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[#00d4aa] ${activeTab === item.id ? 'border-[#00d4aa] text-[#00d4aa]' : 'border-transparent text-slate-300 hover:text-white'}`}
+              >
+                <span aria-hidden="true">{item.icon}</span> {item.label}
+              </button>
+            ))}
           </nav>
         </header>
 
@@ -64,7 +57,7 @@ export default function WorkspacePage() {
       </main>
 
       {/* Right Panel - Companion Chat (30%, fixed width on larger screens) */}
-      <aside className="w-[400px] h-full shrink-0 flex flex-col bg-white/[0.02]">
+      <aside className="w-[400px] h-full shrink-0 flex flex-col bg-white/[0.02]" aria-label="Tuna companion chat">
         <CompanionChat />
       </aside>
     </div>
