@@ -5,3 +5,4 @@ google-adk
 googlemaps
 firebase-admin
 python-dotenv
+pydantic

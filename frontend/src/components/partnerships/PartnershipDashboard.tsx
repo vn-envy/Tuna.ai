@@ -4,7 +4,7 @@ export default function PartnershipDashboard() {
   return (
     <div className="w-full h-full bg-[#0a0f1a] overflow-y-auto p-8">
       <div className="max-w-4xl mx-auto space-y-10">
-        
+
         {/* Header */}
         <div>
           <h2 className="text-3xl font-bold mb-2 flex items-center gap-3">
@@ -21,7 +21,7 @@ export default function PartnershipDashboard() {
               + Generate New Pitch
             </button>
           </div>
-          
+
           <div className="grid grid-cols-1 gap-4">
             {/* Active Pitch Card */}
             <div className="bg-gradient-to-r from-white/5 to-white/[0.02] border border-white/10 rounded-2xl p-6 relative overflow-hidden group hover:border-[#00d4aa]/50 transition-colors">
@@ -35,10 +35,10 @@ export default function PartnershipDashboard() {
                   High Match
                 </div>
               </div>
-              
+
               <div className="bg-black/30 rounded-lg p-4 mb-4 text-sm text-slate-300">
-                <span className="text-white font-medium mb-2 block">Tuna's Intelligence:</span>
-                "They just launched a new Ayurvedic spa last week. I've drafted a pitch offering 2 dedicated Reels focusing on wellness, in exchange for a 2-night comped stay. I linked your media kit filtered for your past luxury content."
+                <span className="text-white font-medium mb-2 block">Tuna&rsquo;s Intelligence:</span>
+                &ldquo;They just launched a new Ayurvedic spa last week. I&rsquo;ve drafted a pitch offering 2 dedicated Reels focusing on wellness, in exchange for a 2-night comped stay. I linked your media kit filtered for your past luxury content.&rdquo;
               </div>
 
               <div className="flex gap-3">
@@ -76,11 +76,11 @@ export default function PartnershipDashboard() {
                 </div>
               </div>
               <p className="text-sm text-slate-300 mb-4 line-clamp-2">
-                Sarah just posted she'll be in Ubud at the exact same time as you. 
+                Sarah just posted she&rsquo;ll be in Ubud at the exact same time as you.
               </p>
               <div className="bg-black/40 rounded p-3 mb-4">
-                <p className="text-xs text-[#0ea5e9] font-medium mb-1">Tuna's Collab Idea:</p>
-                <p className="text-xs text-slate-300">"$10 vs $1000 Balinese Feast" — Leverages her food audience and your luxury angle.</p>
+                <p className="text-xs text-[#0ea5e9] font-medium mb-1">Tuna&rsquo;s Collab Idea:</p>
+                <p className="text-xs text-slate-300">&ldquo;$10 vs $1000 Balinese Feast&rdquo; — Leverages her food audience and your luxury angle.</p>
               </div>
               <button className="w-full bg-indigo-500/20 text-indigo-300 hover:bg-indigo-500/30 text-sm font-medium px-4 py-2 rounded-lg transition-colors border border-indigo-500/30">
                 Generate DM Draft
@@ -99,10 +99,10 @@ export default function PartnershipDashboard() {
                 </div>
               </div>
               <p className="text-sm text-slate-300 mb-4 line-clamp-2">
-                Local drone pilot and surfer. Great for getting high-quality B-roll you can't shoot yourself.
+                Local drone pilot and surfer. Great for getting high-quality B-roll you can&rsquo;t shoot yourself.
               </p>
               <div className="bg-black/40 rounded p-3 mb-4">
-                <p className="text-xs text-[#0ea5e9] font-medium mb-1">Tuna's Collab Idea:</p>
+                <p className="text-xs text-[#0ea5e9] font-medium mb-1">Tuna&rsquo;s Collab Idea:</p>
                 <p className="text-xs text-slate-300">Offer to tag him as a co-collaborator on IG for access to his hidden surf break spots.</p>
               </div>
               <button className="w-full bg-rose-500/20 text-rose-300 hover:bg-rose-500/30 text-sm font-medium px-4 py-2 rounded-lg transition-colors border border-rose-500/30">
