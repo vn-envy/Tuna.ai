@@ -1,76 +1,77 @@
-# Tuna
+# Tuna.ai 🐟
 
-**Plan once. Tuna keeps swimming.**
+> **Your AI travel planning buddy built specifically for content creators.**
 
-Tuna is a migratory AI travel agent. You describe a trip, Tuna plans it, then keeps watching every variable that could change it — prices, schedules, weather, advisories — and tells you the moment something shifts. You stay in control of every booking. Tuna handles the swimming.
+Tuna.ai is a multiagent travel planning and experience engine designed to solve the unique logistical nightmares faced by travel influencers. Inspired by the companion-style interface of Clicky, Tuna.ai acts as an always-on co-pilot to research, plan, and execute travel content schedules.
 
 ---
 
-## Status
+## 🚀 The Challenge We're Solving
 
-🐟 **Day 1 of 9 — building in public.**
+Travel content creators face 6 critical pain points that standard travel apps ignore:
+1. **The Fragmented Ecosystem**: Jumping between 30+ tools to plan a trip.
+2. **The Golden Hour Scramble**: Re-engineering entire days around 20-minute lighting windows.
+3. **Plans Shattering on Contact**: Weather and delays ruining rigid content schedules.
+4. **Content vs. Actually Living**: Failing to balance shoot time with experience time.
+5. **The "Will This Actually Look Good?" Gamble**: Traveling to a spot only to find it unphotogenic.
+6. **Budget Chaos**: Managing expenses across multiple currencies and sponsors.
+7. **The Cold Pitch Blackhole**: Sending generic emails to hotels that get ignored.
+8. **Missed Networking**: Traveling to a new country and missing the chance to collaborate with local or overlapping creators.
 
-Follow along: this repo is updated daily as the build progresses.
+**Tuna.ai solves this by acting as a specialized AI travel team** built on the Google Agent Development Kit (ADK), integrated directly into a companion chat interface.
 
-## Why Tuna
+---
 
-Most travel apps are snapshots. You search, you book, you're on your own. When the price drops, you don't know. When the storm comes, you scramble. When your flight gets moved, you replan from scratch.
+## 🧠 Approach & Logic
 
-Tuna is a current. It keeps swimming. Your trip is alive from intent to return flight.
+We built a **multiagent system** with specialized sub-agents, orchestrated by a root agent ("Tuna").
 
-## How it works
+1. **Frontend (Next.js + Tailwind)**: A split-view web application. The left panel contains the interactive Map, Itinerary Board, and Budget tools. The right panel is a persistent **Companion Chat** (streaming via SSE) that feels conversational rather than transactional.
+2. **Backend (Python FastAPI + Google ADK)**: The intelligence layer.
+    *   **Tuna (Orchestrator Agent)**: Understands user intent and delegates tasks.
+    *   **Destination Scout**: Uses Google Places to find "Instagrammable" spots.
+    *   **Itinerary Architect**: Uses Google Directions and Calendar to build time-blocked schedules explicitly anchored around *Golden Hour*.
+    *   **Content Strategist**: Analyzes YouTube data to find content gaps.
+    *   **Logistics Manager**: Handles emails (Gmail API) and budgets (Sheets API).
+    *   **Partnership Broker (V2)**: The business developer. Scrapes hotel marketing priorities to draft hyper-personalized pitch emails for comped stays, and scans for overlapping creators to suggest specific video collaborations (the "Collab Radar").
 
-Five specialist agents coordinate on every trip:
+---
 
-- **Scout** researches destinations using grounded web search
-- **Navigator** plans the itinerary with costs and routing
-- **Compass** critiques the plan for feasibility, season, conflicts
-- **Pilot** generates booking deep-links for human approval
-- **Currents** monitors the trip continuously and triggers replans
+## 🛠️ How It Works (Technical Implementation)
 
-A human approves the plan before any booking. Tuna never books autonomously.
+*   **Code Quality**: TypeScript for the frontend, Python 3.11+ for the backend. Clean separation of concerns with React components and FastAPI service layers.
+*   **Security**: Uses Firebase Auth (Google Sign-in). The FastAPI backend utilizes custom middleware to verify the `Authorization: Bearer <token>` JWT before processing chat requests, ensuring only authenticated creators can access their AI team.
+*   **Efficiency**: The chat uses Server-Sent Events (SSE) for real-time streaming, preventing long-polling overhead.
+*   **Google Services**: 
+    *   **Gemini 2.5 Flash**: Core reasoning engine.
+    *   **Google ADK**: Agent orchestration.
+    *   **Maps JS API**: For interactive plotting of suggested places.
+    *   **Places API**: Used by the ADK agent to search for photogenic spots.
 
-## Architecture
+---
 
-- **Agents:** Google Agent Development Kit (ADK) on Vertex AI Agent Engine
-- **Models:** Gemini 3.1 Pro (planning, critique) and Gemini 3.1 Flash (research, monitor)
-- **Memory:** Vertex AI Memory Bank (preferences) + Cloud SQL Postgres with pgvector (trips, wishlist)
-- **Grounding:** Google Search + URL Context (native Gemini tools)
-- **Web:** Next.js on Cloud Run
-- **Monitoring loop:** Cloud Scheduler → Pub/Sub → Cloud Run job
-- **Observability:** Cloud Trace, Cloud Logging, Cloud Monitoring
+## ⚠️ Assumptions Made for Hackathon MVP
 
-Region: `asia-south1` (Mumbai).
+Due to the rapid development cycle of this hackathon submission, we made the following assumptions:
+1.  **Auth Simulation**: The Google Sign-in flow sets a simulated secure token that the backend middleware successfully validates, proving the security architecture without requiring complex OAuth consent screen setups for the judges.
 
-## Repo layout
+---
 
+## 💻 Running Locally
+
+### Backend
+```bash
+cd backend
+python3 -m venv venv
+source venv/bin/activate
+pip install -r requirements.txt
+uvicorn api.main:app --host 0.0.0.0 --port 8000
 ```
-tuna/
-├── infra/          Terraform + SQL migrations
-├── agents/         ADK agents, tools, prompts, schemas
-├── web/            Next.js frontend
-├── monitor-worker/ Cloud Run job for the replan loop
-└── scripts/        Deploy + dev helpers
+
+### Frontend
+```bash
+cd frontend
+npm install
+npm run dev
 ```
-
-## Build log
-
-| Day | Status | What shipped |
-|---|---|---|
-| 1 | ⏳ in progress | Project bootstrap, Terraform, schema, ADK skeleton, Next.js scaffold, end-to-end deploy |
-| 2 | — | Scout (Research) + intent extraction |
-| 3 | — | Navigator + Compass (Planner + Critic) |
-| 4 | — | Memory Bank + Wishlist (paste-a-link, manual, chat-driven) |
-| 5 | — | Human-in-the-loop approval, Trip Canvas |
-| 6 | — | Pilot (Booking Handoff) + deep links |
-| 7 | — | Currents (Monitor) + replan loop |
-| 8 | — | Observability + notifications |
-| 9 | — | End-to-end hardening, 5 trip scenarios |
-
-## License
-
-MIT — see [LICENSE](./LICENSE).
-
-## Author
-
-Built by [@Builder-Neekhil](https://huggingface.co/Builder-Neekhil) — building in public.
+Visit `http://localhost:3000`
