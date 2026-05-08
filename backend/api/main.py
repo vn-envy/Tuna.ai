@@ -12,19 +12,28 @@ from dotenv import load_dotenv
 # Load environment variables from .env file
 load_dotenv()
 
+from slowapi import Limiter, _rate_limit_exceeded_handler
+from slowapi.util import get_remote_address
+from slowapi.errors import RateLimitExceeded
+
 # Add the parent directory to sys.path so we can import from agents
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from agents.orchestrator.agent import root_agent
 
+limiter = Limiter(key_func=get_remote_address)
 app = FastAPI(title="Tuna.ai API", description="Backend for Tuna.ai Travel Companion")
+app.state.limiter = limiter
+app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
 # CORS setup for frontend
+allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],  # Next.js default port
+    allow_origins=allowed_origins,
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    allow_methods=["GET", "POST", "OPTIONS"],
+    allow_headers=["Authorization", "Content-Type"],
 )
 
 from typing import Optional
@@ -75,7 +84,8 @@ mock_places = [
 ]
 
 @app.post("/api/chat")
-async def chat_endpoint(request: ChatRequest):
+@limiter.limit("15/minute")
+async def chat_endpoint(request: Request, chat_request: ChatRequest):
     """
     Streaming chat endpoint for the Clicky-inspired companion panel.
     Now connected to the real Google ADK root_agent.
@@ -85,10 +95,8 @@ async def chat_endpoint(request: ChatRequest):
         yield f"data: {json.dumps({'type': 'status', 'text': 'Tuna is thinking...'})}\n\n"
         
         try:
-            # 1. Run the ADK Agent (This handles tool calling like search_photogenic_places automatically)
-            # Running this in a thread to not block the async event loop, though run() is blocking.
-            # For hackathon MVP, we run it directly.
-            response = root_agent.run(request.message)
+            # 1. Run the ADK Agent
+            response = root_agent.run(chat_request.message)
             
             # The agent's response could contain text and potentially tool execution results.
             # ADK agent.run returns a response object which has text.
@@ -110,9 +118,9 @@ async def chat_endpoint(request: ChatRequest):
             # abstraction layer can be complex in a 2-hour window.
             from agents.destination_scout.tools import search_photogenic_places
             
-            if "bali" in request.message.lower() or "tokyo" in request.message.lower() or "place" in request.message.lower() or "where" in request.message.lower():
+            if "bali" in chat_request.message.lower() or "tokyo" in chat_request.message.lower() or "place" in chat_request.message.lower() or "where" in chat_request.message.lower():
                 yield f"data: {json.dumps({'type': 'status', 'text': 'Scouting locations...'})}\n\n"
-                places = search_photogenic_places(request.message)
+                places = search_photogenic_places(chat_request.message)
                 
                 for place in places:
                     if "error" not in place:
@@ -120,7 +128,7 @@ async def chat_endpoint(request: ChatRequest):
                         await asyncio.sleep(0.5)
             
             # Yield a partnership pitch card if asked
-            if "collab" in request.message.lower() or "pitch" in request.message.lower() or "sponsor" in request.message.lower():
+            if "collab" in chat_request.message.lower() or "pitch" in chat_request.message.lower() or "sponsor" in chat_request.message.lower():
                 mock_pitch = {
                     "name": "The St. Regis Bali Resort",
                     "type": "Brand Deal",

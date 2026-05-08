@@ -99,7 +99,7 @@ export default function CompanionChat() {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex flex-col h-full" role="region" aria-label="Chat interface">
       {/* Chat Header */}
       <div className="h-16 flex items-center px-6 border-b border-white/10 shrink-0 bg-white/5 backdrop-blur-sm">
         <div className="flex items-center space-x-3">
@@ -114,7 +114,7 @@ export default function CompanionChat() {
       </div>
 
       {/* Messages Area */}
-      <div className="flex-1 overflow-y-auto p-4 space-y-4">
+      <div className="flex-1 overflow-y-auto p-4 space-y-4" role="log" aria-live="polite">
         {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
             <div className={`max-w-[85%] rounded-2xl p-4 ${
@@ -137,7 +137,7 @@ export default function CompanionChat() {
                     </span>
                   </div>
                   <p className="text-xs text-slate-400 mb-2">{msg.card.description}</p>
-                  <button className="w-full py-1.5 bg-white/10 hover:bg-white/20 text-xs font-medium rounded-lg transition-colors">
+                  <button className="w-full py-1.5 bg-white/10 hover:bg-white/20 text-xs font-medium rounded-lg transition-colors" aria-label="Add to Itinerary">
                     + Add to Itinerary
                   </button>
                 </div>
@@ -166,11 +166,13 @@ export default function CompanionChat() {
             value={input}
             onChange={(e) => setInput(e.target.value)}
             placeholder="Plan a 3-day trip to..."
+            aria-label="Message Tuna"
             className="w-full bg-black/40 border border-white/10 rounded-full py-3 pl-4 pr-12 text-sm text-white placeholder-slate-500 focus:outline-none focus:border-[#00d4aa]/50 transition-colors"
             disabled={isLoading}
           />
           <button 
             type="submit"
+            aria-label="Send message"
             disabled={isLoading || !input.trim()}
             className="absolute right-2 top-1/2 -translate-y-1/2 w-8 h-8 rounded-full bg-[#00d4aa] flex items-center justify-center text-black hover:bg-[#00e6b8] disabled:opacity-50 transition-colors"
           >
