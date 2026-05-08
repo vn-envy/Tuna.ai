@@ -40,7 +40,9 @@ export default function CompanionChat() {
 
     try {
       const token = localStorage.getItem("tuna_auth_token") || "mock_jwt_token_12345";
-      const response = await fetch("http://localhost:8000/api/chat", {
+      const backendUrl = process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
+      
+      const response = await fetch(`${backendUrl}/api/chat`, {
         method: "POST",
         headers: { 
           "Content-Type": "application/json",
