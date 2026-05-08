@@ -1,150 +1,202 @@
-import os
-from fastapi import FastAPI, Depends, HTTPException, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import StreamingResponse
-from pydantic import BaseModel
 import asyncio
+import hmac
 import json
 import os
 import sys
-from dotenv import load_dotenv
+import time
+from collections import defaultdict, deque
+from collections.abc import AsyncGenerator
+from typing import Any, Optional
 
-# Load environment variables from .env file
+from dotenv import load_dotenv
+from fastapi import FastAPI, Request, status
+from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse, StreamingResponse
+from pydantic import BaseModel, Field
+
+# Load environment variables from .env file before reading configuration.
 load_dotenv()
 
-from slowapi import Limiter, _rate_limit_exceeded_handler
-from slowapi.util import get_remote_address
-from slowapi.errors import RateLimitExceeded
-
-# Add the parent directory to sys.path so we can import from agents
+# Add the parent directory to sys.path so we can import from backend/agents when the
+# API is started from either the repository root or the backend directory.
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-from agents.orchestrator.agent import root_agent
+from agents.destination_scout.tools import search_photogenic_places  # noqa: E402
+from agents.orchestrator.agent import root_agent  # noqa: E402
 
-limiter = Limiter(key_func=get_remote_address)
+DEFAULT_DEMO_TOKEN = "mock_jwt_token_12345"
+AUTH_TOKEN = os.environ.get("API_AUTH_TOKEN", DEFAULT_DEMO_TOKEN)
+REQUIRE_AUTH = os.environ.get("REQUIRE_AUTH", "true").lower() not in {"0", "false", "no"}
+PUBLIC_PATHS = {"/", "/api/health", "/docs", "/openapi.json", "/redoc"}
+
+RATE_LIMIT_MAX_REQUESTS = 15
+RATE_LIMIT_WINDOW_SECONDS = 60
+_rate_limit_buckets: defaultdict[str, deque[float]] = defaultdict(deque)
+
 app = FastAPI(title="Tuna.ai API", description="Backend for Tuna.ai Travel Companion")
-app.state.limiter = limiter
-app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-# CORS setup for frontend
-allowed_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+
+def _configured_origins() -> list[str]:
+    raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000")
+    return [origin.strip() for origin in raw_origins.split(",") if origin.strip()]
+
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=allowed_origins,
+    allow_origins=_configured_origins(),
     allow_credentials=True,
     allow_methods=["GET", "POST", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type"],
 )
 
-from typing import Optional
 
-# Mock Auth Middleware to demonstrate security feature
+def _client_ip(request: Request) -> str:
+    forwarded_for = request.headers.get("x-forwarded-for")
+    if forwarded_for:
+        return forwarded_for.split(",", 1)[0].strip()
+    return request.client.host if request.client else "unknown"
+
+
+def _is_rate_limited(request: Request) -> bool:
+    now = time.monotonic()
+    bucket = _rate_limit_buckets[_client_ip(request)]
+    while bucket and now - bucket[0] > RATE_LIMIT_WINDOW_SECONDS:
+        bucket.popleft()
+    if len(bucket) >= RATE_LIMIT_MAX_REQUESTS:
+        return True
+    bucket.append(now)
+    return False
+
+
 @app.middleware("http")
-async def verify_token_middleware(request: Request, call_next):
-    # Allow health check and preflight requests without token
-    if request.url.path == "/api/health" or request.method == "OPTIONS":
-        return await call_next(request)
-        
-    # Check for Authorization header
-    auth_header = request.headers.get("Authorization")
-    
-    # In a real app we would use:
-    # decoded_token = auth.verify_id_token(token)
-    # But for the hackathon MVP, we just check if it's our mock token
-    if not auth_header or not auth_header.startswith("Bearer mock_jwt_token_12345"):
-        # For ease of testing during hackathon demo, we don't strictly reject, 
-        # but we log the security check
-        print("Auth Warning: Missing or invalid token. Allowing through for MVP demo.")
-        
+async def rate_limit_middleware(request: Request, call_next):
+    if request.url.path == "/api/chat" and request.method == "POST" and _is_rate_limited(request):
+        return JSONResponse(
+            status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+            content={"detail": "Rate limit exceeded"},
+        )
+    return await call_next(request)
+
+
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
     response = await call_next(request)
+    response.headers.setdefault("X-Content-Type-Options", "nosniff")
+    response.headers.setdefault("X-Frame-Options", "DENY")
+    response.headers.setdefault("Referrer-Policy", "no-referrer")
+    response.headers.setdefault("Permissions-Policy", "camera=(), microphone=(), geolocation=()")
     return response
 
+
+@app.middleware("http")
+async def verify_token_middleware(request: Request, call_next):
+    if request.method == "OPTIONS" or request.url.path in PUBLIC_PATHS:
+        return await call_next(request)
+
+    if not REQUIRE_AUTH:
+        return await call_next(request)
+
+    auth_header = request.headers.get("Authorization", "")
+    scheme, _, token = auth_header.partition(" ")
+    is_valid = scheme.lower() == "bearer" and hmac.compare_digest(token, AUTH_TOKEN)
+
+    if not is_valid:
+        return JSONResponse(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            content={"detail": "Missing or invalid bearer token"},
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+
+    return await call_next(request)
+
+
 class ChatRequest(BaseModel):
-    message: str
-    trip_id: Optional[str] = None
-    
-# Mock data for phase 1
-mock_places = [
-    {
-        "id": "p1",
-        "name": "Uluwatu Temple",
-        "type": "Attraction",
-        "rating": 4.8,
-        "golden_hour": "17:30 - 18:30",
-        "description": "Cliff-top temple with stunning ocean views, perfect for sunset content."
-    },
-    {
-        "id": "p2",
-        "name": "Tegallalang Rice Terrace",
-        "type": "Attraction",
-        "rating": 4.7,
-        "golden_hour": "06:00 - 07:00",
-        "description": "Iconic tiered rice paddies. Best shot early morning to avoid crowds and harsh shadows."
-    }
-]
+    message: str = Field(..., min_length=1, max_length=1000)
+    trip_id: Optional[str] = Field(default=None, max_length=80)
+
+
+def _wants_places(message: str) -> bool:
+    normalized = message.lower()
+    return any(term in normalized for term in ("bali", "tokyo", "place", "where", "sunset", "photo"))
+
+
+def _wants_partnerships(message: str) -> bool:
+    normalized = message.lower()
+    return any(term in normalized for term in ("collab", "pitch", "sponsor", "brand"))
+
+
+def _format_sse(event: dict[str, Any]) -> str:
+    return f"data: {json.dumps(event)}\n\n"
+
+
+def _fallback_agent_text(message: str) -> str:
+    if _wants_places(message):
+        return (
+            "I found creator-friendly location ideas with golden-hour timing. "
+            "Prioritize one sunrise shoot, one flexible indoor backup, and one sunset hero location."
+        )
+    if _wants_partnerships(message):
+        return (
+            "I can help package your audience, trip dates, and deliverables into a concise brand pitch. "
+            "Start with one high-fit hotel or activity partner and a clear content exchange."
+        )
+    return "Tell me your destination, dates, creator niche, and budget, and I will shape a shoot-ready travel plan."
+
+
+async def _agent_text(message: str) -> str:
+    if os.environ.get("GOOGLE_API_KEY") in {None, "", "mock_key_for_now"}:
+        return _fallback_agent_text(message)
+
+    response = await asyncio.to_thread(root_agent.run, message)
+    return response.text if hasattr(response, "text") else str(response)
+
 
 @app.post("/api/chat")
-@limiter.limit("15/minute")
-async def chat_endpoint(request: Request, chat_request: ChatRequest):
-    """
-    Streaming chat endpoint for the Clicky-inspired companion panel.
-    Now connected to the real Google ADK root_agent.
-    """
-    async def generate_response():
-        # Status update
-        yield f"data: {json.dumps({'type': 'status', 'text': 'Tuna is thinking...'})}\n\n"
-        
-        try:
-            # 1. Run the ADK Agent
-            response = root_agent.run(chat_request.message)
-            
-            # The agent's response could contain text and potentially tool execution results.
-            # ADK agent.run returns a response object which has text.
-            final_text = response.text if hasattr(response, 'text') else str(response)
-            
-            # 2. Check if the prompt implied looking for places and we should inject a place card
-            # In a full integration, we'd intercept the tool's return value.
-            # For this MVP, we will run the tool directly here if the agent didn't format it right,
-            # or just stream the text.
-            
-            # Stream the text word by word for the Clicky effect
-            yield f"data: {json.dumps({'type': 'status', 'text': 'Writing...'})}\n\n"
-            for word in final_text.split(" "):
-                yield f"data: {json.dumps({'type': 'text', 'text': word + ' '})}\n\n"
-                await asyncio.sleep(0.02)
-                
-            # As a showcase of the "Depth" tool calling, we will manually trigger the tool here
-            # to guarantee the UI gets a rich card, since extracting raw tool calls from ADK's 
-            # abstraction layer can be complex in a 2-hour window.
-            from agents.destination_scout.tools import search_photogenic_places
-            
-            if "bali" in chat_request.message.lower() or "tokyo" in chat_request.message.lower() or "place" in chat_request.message.lower() or "where" in chat_request.message.lower():
-                yield f"data: {json.dumps({'type': 'status', 'text': 'Scouting locations...'})}\n\n"
-                places = search_photogenic_places(chat_request.message)
-                
-                for place in places:
-                    if "error" not in place:
-                        yield f"data: {json.dumps({'type': 'place_card', 'data': place})}\n\n"
-                        await asyncio.sleep(0.5)
-            
-            # Yield a partnership pitch card if asked
-            if "collab" in chat_request.message.lower() or "pitch" in chat_request.message.lower() or "sponsor" in chat_request.message.lower():
-                mock_pitch = {
-                    "name": "The St. Regis Bali Resort",
-                    "type": "Brand Deal",
-                    "target": "PR Director",
-                    "golden_hour": "Luxury Stay",
-                    "description": "They just launched a new Ayurvedic spa. I've drafted a pitch offering 2 Reels for a comped stay."
-                }
-                yield f"data: {json.dumps({'type': 'place_card', 'data': mock_pitch})}\n\n"
+async def chat_endpoint(chat_request: ChatRequest):
+    """Stream Tuna's response and rich creator-planning cards as Server-Sent Events."""
 
-        except Exception as e:
-             yield f"data: {json.dumps({'type': 'text', 'text': f'Oops! My agent brain had a glitch: {str(e)}'})}\n\n"
-             
-        # Done
-        yield f"data: {json.dumps({'type': 'done'})}\n\n"
-        
+    async def generate_response() -> AsyncGenerator[str, None]:
+        yield _format_sse({"type": "status", "text": "Tuna is thinking..."})
+
+        try:
+            final_text = await _agent_text(chat_request.message)
+
+            yield _format_sse({"type": "status", "text": "Writing..."})
+            for word in final_text.split(" "):
+                yield _format_sse({"type": "text", "text": f"{word} "})
+                await asyncio.sleep(0.01)
+
+            if _wants_places(chat_request.message):
+                yield _format_sse({"type": "status", "text": "Scouting locations..."})
+                for place in search_photogenic_places(chat_request.message):
+                    if "error" not in place:
+                        yield _format_sse({"type": "place_card", "data": place})
+                        await asyncio.sleep(0.1)
+
+            if _wants_partnerships(chat_request.message):
+                yield _format_sse(
+                    {
+                        "type": "place_card",
+                        "data": {
+                            "name": "The St. Regis Bali Resort",
+                            "type": "Brand Deal",
+                            "target": "PR Director",
+                            "golden_hour": "Luxury Stay",
+                            "description": "Draft a two-Reel wellness pitch tied to their spa launch and your media kit.",
+                        },
+                    }
+                )
+        except Exception:
+            yield _format_sse(
+                {
+                    "type": "text",
+                    "text": "Oops! My agent brain had a glitch, but your request was received. Please try again.",
+                }
+            )
+        finally:
+            yield _format_sse({"type": "done"})
+
     return StreamingResponse(generate_response(), media_type="text/event-stream")
+
 
 @app.get("/api/health")
 def health_check():
