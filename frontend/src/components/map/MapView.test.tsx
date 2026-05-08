@@ -1,6 +1,6 @@
 import "@testing-library/jest-dom/vitest";
 import { cleanup, render, screen } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import MapView from "./MapView";
 
 afterEach(() => {
@@ -8,10 +8,17 @@ afterEach(() => {
 });
 
 describe("MapView", () => {
-  it("shows an accessible fallback when the Google Maps key is missing", () => {
+  beforeEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("loads runtime config before deciding whether the Google Maps key is available", async () => {
+    vi.spyOn(globalThis, "fetch").mockResolvedValue(Response.json({ googleMapsApiKey: "" }));
+
     render(<MapView />);
 
-    expect(screen.getByRole("status")).toHaveTextContent(/map unavailable/i);
-    expect(screen.getByText(/NEXT_PUBLIC_GOOGLE_MAPS_API_KEY is missing/i)).toBeInTheDocument();
+    expect(screen.getByRole("status")).toHaveTextContent(/loading map configuration/i);
+    expect(await screen.findByText(/Map Configuration Needed/i)).toBeInTheDocument();
+    expect(screen.getByText(/GOOGLE_MAPS_API_KEY/i)).toBeInTheDocument();
   });
 });

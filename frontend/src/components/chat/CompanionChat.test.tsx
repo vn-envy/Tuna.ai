@@ -43,7 +43,7 @@ describe("CompanionChat", () => {
 
     await waitFor(() => expect(screen.getByText(/Great idea!/i)).toBeInTheDocument());
     expect(fetchMock).toHaveBeenCalledWith(
-      "http://localhost:8000/api/chat",
+      "/api/chat",
       expect.objectContaining({
         method: "POST",
         headers: expect.objectContaining({ Authorization: "Bearer mock_jwt_token_12345" }),

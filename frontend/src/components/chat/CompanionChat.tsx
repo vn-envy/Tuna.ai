@@ -25,10 +25,6 @@ type StreamEvent =
 
 const DEMO_AUTH_TOKEN = "mock_jwt_token_12345";
 
-function getBackendUrl() {
-  return process.env.NEXT_PUBLIC_BACKEND_URL || "http://localhost:8000";
-}
-
 function parseServerSentEvents(chunk: string) {
   return chunk
     .split("\n\n")
@@ -65,7 +61,7 @@ export default function CompanionChat() {
 
     try {
       const token = localStorage.getItem("tuna_auth_token") || DEMO_AUTH_TOKEN;
-      const response = await fetch(`${getBackendUrl()}/api/chat`, {
+      const response = await fetch("/api/chat", {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -75,7 +71,14 @@ export default function CompanionChat() {
       });
 
       if (!response.ok) {
-        throw new Error(`Chat request failed with status ${response.status}`);
+        let detail = `Chat request failed with status ${response.status}`;
+        try {
+          const errorBody = await response.json();
+          detail = errorBody.detail || detail;
+        } catch {
+          // Keep the status-based fallback when the upstream error is not JSON.
+        }
+        throw new Error(detail);
       }
       if (!response.body) {
         throw new Error("No response body");
@@ -116,7 +119,7 @@ export default function CompanionChat() {
       setMessages((prev) =>
         prev.map((msg) =>
           msg.id === agentMessageId
-            ? { ...msg, text: "I couldn't reach Tuna's planning service. Please try again in a moment." }
+            ? { ...msg, text: error instanceof Error ? error.message : "I couldn't reach Tuna's planning service. Please try again in a moment." }
             : msg,
         ),
       );
